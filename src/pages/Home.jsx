@@ -4,6 +4,7 @@ import Sidebar from "../components/layout/Sidebar";
 import ChatWindow from "../components/chat/ChatWindow";
 import ChatInput from "../components/chat/ChatInput";
 
+const API_URL = "http://localhost:5000/api/chat/multi";
 
 function Home() {
   const [messages, setMessages] = useState([]);
@@ -24,17 +25,53 @@ function Home() {
     // Show typing indicator
     setIsTyping(true);
 
-    // Fake AI response
-    setTimeout(() => {
+    const formattedHistory = messages.map((msg) => ({
+      role: msg.sender === "user" ? "user" : "model",
+      parts: [{ text: msg.text }],
+    }));
+
+    try {
+      // 3. Request real Gemini response from your Express server
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          history: formattedHistory,
+          message: text,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch response");
+      }
+
+      // 4. Append AI response
       const botMessage = {
         id: Date.now() + 1,
         sender: "bot",
-        text: `You asked: "${text}"`,
+        text: data.response,
       };
 
       setMessages((prev) => [...prev, botMessage]);
+    } catch (error) {
+      console.error("Chat error:", error);
+      
+      const errorMessage = {
+        id: Date.now() + 1,
+        sender: "bot",
+        text: "Sorry, I ran into an issue connecting to the server.",
+      };
+
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsTyping(false);
-    }, 1000);
+    }
+
+    function handleNewChat() {
+    setMessages([]);
+    }
   }
 
   return (
